@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+using namespace std::literals;
+
 // Позиция ячейки. Индексация с нуля.
 struct Position {
     int row = 0;
@@ -42,13 +44,28 @@ public:
         Div0,  // в результате вычисления возникло деление на ноль
     };
 
-    FormulaError(Category category);
+    FormulaError(Category category)
+        : category_(category)
+    {
+    }
 
-    Category GetCategory() const;
+    Category GetCategory() const {
+        return category_;
+    }
 
-    bool operator==(FormulaError rhs) const;
+    bool operator==(FormulaError rhs) const {
+        return category_ == rhs.category_;
+    }
 
-    std::string_view ToString() const;
+    std::string_view ToString() const {
+        if (category_ == Category::Ref) {
+            return "#REF!"sv;
+        }
+        if (category_ == Category::Value) {
+            return "#VALUE!"sv;
+        }
+        return "#DIV/0!"sv;
+    }
 
 private:
     Category category_;

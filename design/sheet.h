@@ -21,14 +21,19 @@ public:
     void PrintValues(std::ostream& output) const override;
     void PrintTexts(std::ostream& output) const override;
 
-    const Cell* GetConcreteCell(Position pos) const;
-    Cell* GetConcreteCell(Position pos);
+    // Можете дополнить ваш класс нужными полями и методами
+
+    // Recursive search for pos in Formula GetReferencedCells() for non-existing cell before creating cell
+    // cause Formula can be incorrect;
+    bool FindCyclicDependencies(const std::vector<Position>& previous_cells, Position pos) const;
 
 private:
-    void MaybeIncreaseSizeToIncludePosition(Position pos);
-    void PrintCells(std::ostream& output,
-                    const std::function<void(const CellInterface&)>& printCell) const;
-    Size GetActualSize() const;
+    // Можете дополнить ваш класс нужными полями и методами
+    using Table = std::vector<std::vector<std::unique_ptr<Cell>>>;
+    Table ptr_table_;
 
-    std::vector<std::vector<std::unique_ptr<Cell>>> cells_;
+    int max_width_ = 0;
+    int max_height_ = 0;
+
+    void FindAndDecreaseMaxHeightAndWidth();
 };
