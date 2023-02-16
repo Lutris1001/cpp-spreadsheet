@@ -147,19 +147,23 @@ namespace ASTImpl {
 
             double Evaluate([[maybe_unused]] std::function<double(Position)> function) const override {
                 if (type_ == Subtract) {
-                    return lhs_->Evaluate(function) - rhs_->Evaluate(function);
+                    auto result = lhs_->Evaluate(function) - rhs_->Evaluate(function);
+                    return !std::isinf(result) ? result : throw FormulaError(FormulaError::Category::Div0);
                 }
                 if (type_ == Multiply) {
-                    return lhs_->Evaluate(function) * rhs_->Evaluate(function);
+                    auto result = lhs_->Evaluate(function) * rhs_->Evaluate(function);
+                    return !std::isinf(result) ? result : throw FormulaError(FormulaError::Category::Div0);
                 }
                 if (type_ == Divide) {
                     auto div = rhs_->Evaluate(function);
                     if (div == 0 || std::isinf(div)) {
                         throw FormulaError(FormulaError::Category::Div0);
                     }
-                    return lhs_->Evaluate(function) / div;
+                    auto result = lhs_->Evaluate(function) / rhs_->Evaluate(function);
+                    return !std::isinf(result) ? result : throw FormulaError(FormulaError::Category::Div0);
                 }
-                return lhs_->Evaluate(function) + rhs_->Evaluate(function);
+                auto result = lhs_->Evaluate(function) + rhs_->Evaluate(function);
+                return !std::isinf(result) ? result : throw FormulaError(FormulaError::Category::Div0);
             }
 
         private:

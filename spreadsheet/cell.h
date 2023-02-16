@@ -6,6 +6,8 @@
 #include <functional>
 #include <unordered_set>
 
+#include <iostream>
+
 class Sheet;
 
 class Impl {
@@ -15,6 +17,7 @@ public:
     virtual std::string GetRawValue() = 0;
     virtual CellInterface::Value GetValue() = 0;
     virtual std::vector<Position> GetReferencedCells() const = 0;
+    virtual void CalculateValue() {};
 };
 
 class EmptyImpl final : public Impl {
@@ -50,11 +53,12 @@ public:
     CellInterface::Value GetValue() override;
     std::vector<Position> GetReferencedCells() const override;
 
+    void CalculateValue() override;
+
 private:
     SheetInterface* sheet_;
     std::string raw_;
     CellInterface::Value complete_;
-    Position this_cell_pos_;
     std::unique_ptr<FormulaInterface> expr_;
 };
 
@@ -71,9 +75,16 @@ public:
     std::string GetText() const override;
     std::vector<Position> GetReferencedCells() const override;
 
-    bool IsReferenced() const;
+    // without itself recalculation
+    void RecursiveRecalculateValueCycle();
+
+    void RecursiveRecalculateValue();
+
+    void AddDependency(Position pos);
+    void DeleteDependency(Position pos);
 
 private:
     SheetInterface* sheet_;
     std::unique_ptr<Impl> impl_;
+    std::vector<Position> depends_from_this_;
 };

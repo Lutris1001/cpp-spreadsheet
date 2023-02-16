@@ -24,6 +24,7 @@ std::unique_ptr<Impl> ParseCellContent(std::string text, SheetInterface* sheet) 
 // формулы
 using Value = std::variant<std::string, double, FormulaError>;
 
+// Реализуйте следующие методы
 Cell::Cell(SheetInterface& sheet)
         : sheet_(&sheet)
 {
@@ -55,9 +56,37 @@ void Cell::Set(std::string text) {
 
 }
 
+void Cell::AddDependency(Position pos) {
+    auto it = std::find(depends_from_this_.begin(), depends_from_this_.end(), pos);
+    if (it == depends_from_this_.end()) {
+        depends_from_this_.push_back(pos);
+    }
+}
+
+void Cell::DeleteDependency(Position pos) {
+    auto it = std::find(depends_from_this_.begin(), depends_from_this_.end(), pos);
+    if (it != depends_from_this_.end()) {
+        depends_from_this_.erase(it);
+    }
+}
+
+void Cell::RecursiveRecalculateValueCycle() {
+    for (const auto& cell : depends_from_this_) {
+        auto ptr = dynamic_cast<Cell*>(sheet_->GetCell(cell));
+        ptr->RecursiveRecalculateValue();
+    }
+}
+
+void Cell::RecursiveRecalculateValue() {
+
+    impl_->CalculateValue();
+    RecursiveRecalculateValueCycle();
+}
+
 
 void Cell::Clear() {
     impl_ = std::make_unique<EmptyImpl>();
+    RecursiveRecalculateValueCycle();
 }
 
 Cell::Value Cell::GetValue() const {
@@ -105,14 +134,21 @@ FormulaImpl::FormulaImpl(const std::string& expression, SheetInterface* sheet)
 
     raw_ = "=" + expr_->GetExpression();
 
-    auto result = expr_->Evaluate(*sheet);
+    CalculateValue();
+}
+
+void FormulaImpl::CalculateValue() {
+
+    auto result = expr_->Evaluate(*sheet_);
 
     if (std::holds_alternative<FormulaError>(result)) {
         complete_ = std::get<FormulaError>(result);
+        return;
     }
 
     if (std::holds_alternative<double>(result)) {
         complete_ = std::get<double>(result);
+        return;
     }
 }
 

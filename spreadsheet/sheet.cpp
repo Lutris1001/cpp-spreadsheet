@@ -8,7 +8,10 @@
 #include <iostream>
 #include <optional>
 
+#include <iostream>
+
 using namespace std::literals;
+
 
 Sheet::~Sheet() {
 }
@@ -19,42 +22,71 @@ void Sheet::SetCell(Position pos, std::string text) {
         throw InvalidPositionException("SetCell ERROR: InvalidPosition.");
     }
 
-    if (ptr_table_.size() <= size_t(pos.row)) {
-        ptr_table_.resize(pos.row + 1);
-    }
-
-    if (ptr_table_.at(pos.row).size() <= size_t(pos.col)) {
-        ptr_table_[pos.row].resize(pos.col + 1);
-    }
-
-    // update minimal print area
-    if (pos.col + 1 > max_width_) {
-        max_width_  = pos.col + 1;
-    }
-    if (pos.row + 1 > max_height_) {
-        max_height_ = pos.row + 1;
-    }
-
+    // Check circular dependencies
     if (!text.empty() && text[0] == '=' && text != "=") {
-        auto formula = ParseFormula(text.substr(1));
-        auto referenced = formula->GetReferencedCells();
+        auto referenced = ParseFormula(text.substr(1))->GetReferencedCells();
         bool is_cycle = FindCyclicDependencies(referenced, pos);
 
         if (is_cycle) {
-            throw CircularDependencyException("Sheet ERROR: Formula Circular Dependency");
+            throw CircularDependencyException("Sheet SetCell ERROR: Formula Circular Dependency");
         }
     }
 
-    ptr_table_[pos.row][pos.col] = std::make_unique<Cell>(*this);
-    auto ptr = dynamic_cast<Cell*>(GetCell(pos));
-    ptr->Set(text);
 
-    for (auto i : ptr->GetReferencedCells()) {
-        auto cell = GetCell(i);
-        if (cell == nullptr) {
-            SetCell(i, "");
+    auto cell_ptr = dynamic_cast<Cell*>(GetCell(pos));
+
+    // Delete old dependencies if this cell not new
+    if (cell_ptr != nullptr) {
+        for (const auto& ref_cell_pos : cell_ptr->GetReferencedCells()) {
+            auto referenced = dynamic_cast<Cell*>(GetCell(ref_cell_pos));
+            if (referenced != nullptr) {
+                referenced->DeleteDependency(pos);
+            }
         }
     }
+
+    // Create new cell in pos or set old
+    if (cell_ptr == nullptr) {
+
+        // resize table for new cell
+        if (ptr_table_.size() <= size_t(pos.row)) {
+            ptr_table_.resize(pos.row + 1);
+        }
+
+        if (ptr_table_.at(pos.row).size() <= size_t(pos.col)) {
+            ptr_table_[pos.row].resize(pos.col + 1);
+        }
+
+        // update minimal print area
+        if (pos.col + 1 > max_width_) {
+            max_width_  = pos.col + 1;
+        }
+        if (pos.row + 1 > max_height_) {
+            max_height_ = pos.row + 1;
+        }
+
+        ptr_table_[pos.row][pos.col] = std::make_unique<Cell>(*this);
+        cell_ptr = dynamic_cast<Cell*>(GetCell(pos));
+        cell_ptr->Set(text);
+    } else {
+        cell_ptr->Set(text);
+    }
+
+    // Adding New Dependencies after changing formula and refreshing dependent values
+    for (const auto& new_cell_ref_pos : cell_ptr->GetReferencedCells()) {
+        auto referenced = dynamic_cast<Cell*>(GetCell(new_cell_ref_pos));
+        // if referenced to non-existing pos, creates Empty Cell to add dependency
+        if (referenced == nullptr) {
+            SetCell(new_cell_ref_pos, "");
+        }
+        // this needed to refresh ptr if empty cell was created
+        referenced = dynamic_cast<Cell*>(GetCell(new_cell_ref_pos));
+
+        referenced->AddDependency(pos);
+    }
+
+    // Recursive recalculation without itself recalculation
+    cell_ptr->RecursiveRecalculateValueCycle();
 
 }
 
@@ -91,6 +123,11 @@ void Sheet::ClearCell(Position pos) {
     }
 
     if (pos.IsValid() && ptr_table_.size() > size_t(pos.row) && ptr_table_.at(pos.row).size() > size_t(pos.col)) {
+        // Recursive recalculation
+        auto cell_ptr = dynamic_cast<Cell*>(GetCell(pos));
+        if (cell_ptr != nullptr) {
+            cell_ptr->Clear();
+        }
         ptr_table_[pos.row][pos.col].reset();
     }
 
@@ -169,11 +206,14 @@ void Sheet::FindAndDecreaseMaxHeightAndWidth() {
 
     max_width_ = width;
     max_height_ = height;
+
 }
+
 
 std::unique_ptr<SheetInterface> CreateSheet() {
     return std::make_unique<Sheet>();
 }
+
 
 bool Sheet::FindCyclicDependencies(const std::vector<Position>& previous_cells, Position pos) const {
 

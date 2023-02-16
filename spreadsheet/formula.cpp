@@ -18,7 +18,7 @@ std::ostream& operator<<(std::ostream& output, FormulaError fe) {
 namespace {
     class Formula : public FormulaInterface {
     public:
-
+    // Реализуйте следующие методы:
     explicit Formula(std::string expression) try
             : ast_(ParseFormulaAST(expression)) {
     } catch (const std::exception& exc) {
@@ -56,6 +56,10 @@ namespace {
                         std::string str = std::get<std::string>(cell_value);
                         if (str.empty()) {
                             return result;
+                        }
+
+                        if (str.find_first_not_of("1234567890.") != str.npos) {
+                            throw FormulaError(FormulaError::Category::Value);
                         }
 
                         try {

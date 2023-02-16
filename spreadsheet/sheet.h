@@ -26,6 +26,7 @@ public:
     bool FindCyclicDependencies(const std::vector<Position>& previous_cells, Position pos) const;
 
 private:
+    // Можете дополнить ваш класс нужными полями и методами
     using Table = std::vector<std::vector<std::unique_ptr<CellInterface>>>;
     Table ptr_table_;
 
